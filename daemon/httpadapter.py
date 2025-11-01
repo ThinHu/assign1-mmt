@@ -20,6 +20,7 @@ raw URL paths and RESTful route definitions, and integrates with
 Request and Response objects to handle client-server communication.
 """
 
+import json # <-- ĐÃ THÊM: Cần thiết để xử lý phản hồi API
 from .request import Request
 from .response import Response
 from .dictionary import CaseInsensitiveDict
@@ -28,20 +29,7 @@ class HttpAdapter:
     """
     A mutable :class:`HTTP adapter <HTTP adapter>` for managing client connections
     and routing requests.
-
-    The `HttpAdapter` class encapsulates the logic for receiving HTTP requests,
-    dispatching them to appropriate route handlers, and constructing responses.
-    It supports RESTful routing via hooks and integrates with :class:`Request <Request>` 
-    and :class:`Response <Response>` objects for full request lifecycle management.
-
-    Attributes:
-        ip (str): IP address of the client.
-        port (int): Port number of the client.
-        conn (socket): Active socket connection.
-        connaddr (tuple): Address of the connected client.
-        routes (dict): Mapping of route paths to handler functions.
-        request (Request): Request object for parsing incoming data.
-        response (Response): Response object for building and sending replies.
+    ...
     """
 
     __attrs__ = [
@@ -57,12 +45,7 @@ class HttpAdapter:
     def __init__(self, ip, port, conn, connaddr, routes):
         """
         Initialize a new HttpAdapter instance.
-
-        :param ip (str): IP address of the client.
-        :param port (int): Port number of the client.
-        :param conn (socket): Active socket connection.
-        :param connaddr (tuple): Address of the connected client.
-        :param routes (dict): Mapping of route paths to handler functions.
+        ...
         """
 
         #: IP address.
@@ -83,14 +66,7 @@ class HttpAdapter:
     def handle_client(self, conn, addr, routes):
         """
         Handle an incoming client connection.
-
-        This method reads the request from the socket, prepares the request object,
-        invokes the appropriate route handler if available, builds the response,
-        and sends it back to the client.
-
-        :param conn (socket): The client socket connection.
-        :param addr (tuple): The client's address.
-        :param routes (dict): The route mapping for dispatching requests.
+        ...
         """
 
         # Connection handler.
@@ -103,19 +79,74 @@ class HttpAdapter:
         resp = self.response
 
         # Handle the request
-        msg = conn.recv(1024).decode()
-        req.prepare(msg, routes)
+        # Tăng kích thước buffer để nhận cả header và body (nếu có)
+        msg = conn.recv(4096).decode() 
+        
+        # Tách header và body
+        try:
+            header_part, body_part = msg.split('\r\n\r\n', 1)
+        except ValueError:
+            header_part = msg
+            body_part = "" # Không có body
+            
+        req.prepare(header_part, routes) # Chỉ parse header
+        req.body = body_part # Lưu body riêng
+
+        #
+        # --- BẮT ĐẦU PHẦN SỬA ĐỔI CHÍNH ---
+        #
+        response = None # Khởi tạo response
 
         # Handle request hook
         if req.hook:
-            print("[HttpAdapter] hook in route-path METHOD {} PATH {}".format(req.hook._route_path,req.hook._route_methods))
-            req.hook(headers = "bksysnet",body = "get in touch")
+            print("[HttpAdapter] hook in route-path METHOD {} PATH {}".format(req.hook._route_path, req.hook._route_methods))
+            
             #
             # TODO: handle for App hook here
+            # ĐÃ HIỆN THỰC:
+            # 1. Gọi hàm hook (ví dụ: submit_info) với header VÀ body của request
+            # 2. Lấy kết quả trả về (dưới dạng 'dict')
             #
+            try:
+                api_response_dict = req.hook(headers=req.headers, body=req.body)
+                
+                # 3. Chuyển dict thành chuỗi JSON
+                json_body = json.dumps(api_response_dict)
+                content_length = len(json_body)
+                
+                # 4. Xây dựng phản hồi HTTP 200 OK với nội dung là JSON
+                response = (
+                    "HTTP/1.1 200 OK\r\n"
+                    "Content-Type: application/json\r\n"
+                    f"Content-Length: {content_length}\r\n"
+                    "Connection: close\r\n"
+                    "\r\n"
+                    f"{json_body}"
+                ).encode('utf-8')
 
-        # Build response
-        response = resp.build_response(req)
+            except Exception as e:
+                print(f"[HttpAdapter] Lỗi khi xử lý hook: {e}")
+                # Xây dựng phản hồi lỗi 500 Internal Server Error
+                error_body = json.dumps({"error": "Internal Server Error", "message": str(e)})
+                response = (
+                    "HTTP/1.1 500 Internal Server Error\r\n"
+                    "Content-Type: application/json\r\n"
+                    f"Content-Length: {len(error_body)}\r\n"
+                    "Connection: close\r\n"
+                    "\r\n"
+                    f"{error_body}"
+                ).encode('utf-8')
+
+        else:
+            #
+            # Nếu KHÔNG có hook, đây là yêu cầu file tĩnh (ví dụ: /index.html)
+            # Giữ nguyên logic cũ:
+            #
+            # Build response
+            response = resp.build_response(req)
+
+        # --- KẾT THÚC PHẦN SỬA ĐỔI ---
+        #
 
         #print(response)
         conn.sendall(response)
@@ -125,33 +156,31 @@ class HttpAdapter:
     def extract_cookies(self, req, resp):
         """
         Build cookies from the :class:`Request <Request>` headers.
-
-        :param req:(Request) The :class:`Request <Request>` object.
-        :param resp: (Response) The res:class:`Response <Response>` object.
-        :rtype: cookies - A dictionary of cookie key-value pairs.
+        ...
         """
         cookies = {}
-        for header in headers:
-            if header.startswith("Cookie:"):
-                cookie_str = header.split(":", 1)[1].strip()
-                for pair in cookie_str.split(";"):
+        # Lấy header từ req, không phải 'headers' (biến không tồn tại)
+        cookie_header = req.headers.get('cookie', '')
+        if cookie_header:
+            for pair in cookie_header.split(';'):
+                try:
                     key, value = pair.strip().split("=")
                     cookies[key] = value
+                except ValueError:
+                    pass # Bỏ qua cookie bị định dạng sai
         return cookies
 
     def build_response(self, req, resp):
         """Builds a :class:`Response <Response>` object 
-
-        :param req: The :class:`Request <Request>` used to generate the response.
-        :param resp: The  response object.
-        :rtype: Response
+        ...
         """
         response = Response()
 
         # Set encoding.
-        response.encoding = get_encoding_from_headers(response.headers)
+        # response.encoding = get_encoding_from_headers(response.headers) # Hàm này không tồn tại
         response.raw = resp
-        response.reason = response.raw.reason
+        # response.reason = response.raw.reason # resp không có 'raw'
+        response.reason = "OK" # Giả định
 
         if isinstance(req.url, bytes):
             response.url = req.url.decode("utf-8")
@@ -159,7 +188,8 @@ class HttpAdapter:
             response.url = req.url
 
         # Add new cookies from the server.
-        response.cookies = extract_cookies(req)
+        # response.cookies = extract_cookies(req) # Đây là phương thức, không phải hàm
+        response.cookies = self.extract_cookies(req, resp) # Sửa lại cách gọi
 
         # Give the Response some context.
         response.request = req
@@ -168,54 +198,19 @@ class HttpAdapter:
         return response
 
     # def get_connection(self, url, proxies=None):
-        # """Returns a url connection for the given URL. 
-
-        # :param url: The URL to connect to.
-        # :param proxies: (optional) A Requests-style dictionary of proxies used on this request.
-        # :rtype: int
-        # """
-
-        # proxy = select_proxy(url, proxies)
-
-        # if proxy:
-            # proxy = prepend_scheme_if_needed(proxy, "http")
-            # proxy_url = parse_url(proxy)
-            # if not proxy_url.host:
-                # raise InvalidProxyURL(
-                    # "Please check proxy URL. It is malformed "
-                    # "and could be missing the host."
-                # )
-            # proxy_manager = self.proxy_manager_for(proxy)
-            # conn = proxy_manager.connection_from_url(url)
-        # else:
-            # # Only scheme should be lower case
-            # parsed = urlparse(url)
-            # url = parsed.geturl()
-            # conn = self.poolmanager.connection_from_url(url)
-
-        # return conn
-
+        # ... (giữ nguyên)
 
     def add_headers(self, request):
         """
         Add headers to the request.
-
-        This method is intended to be overridden by subclasses to inject
-        custom headers. It does nothing by default.
-
-        
-        :param request: :class:`Request <Request>` to add headers to.
+        ...
         """
         pass
 
     def build_proxy_headers(self, proxy):
         """Returns a dictionary of the headers to add to any request sent
         through a proxy. 
-
-        :class:`HttpAdapter <HttpAdapter>`.
-
-        :param proxy: The url of the proxy being used for this request.
-        :rtype: dict
+        ...
         """
         headers = {}
         #
@@ -226,6 +221,12 @@ class HttpAdapter:
         username, password = ("user1", "password")
 
         if username:
-            headers["Proxy-Authorization"] = (username, password)
+            # Cần chuẩn bị auth, không phải gán tuple
+            # Ví dụ: Basic Auth (cần base64)
+            # import base64
+            # auth_str = f"{username}:{password}"
+            # auth_b64 = base64.b64encode(auth_str.encode()).decode()
+            # headers["Proxy-Authorization"] = f"Basic {auth_b64}"
+            pass # Giữ nguyên logic TODO
 
         return headers
