@@ -93,12 +93,13 @@ def resolve_routing_policy(hostname, routes):
     :params routes (dict): dictionary mapping hostnames and location.
     """
 
-    proxy_map, policy = routes.get(hostname,('127.0.0.1:9000','round-robin'))
+    proxy_map, policy = routes.get(hostname.split(":")[0],('127.0.0.1:9000','round-robin'))
+
 
 
     proxy_host = ''
     proxy_port = '9000'
-    if isinstance(proxy_map, list):
+    if isinstance(proxy_map,list):
         if len(proxy_map) == 0:
             print("[Proxy] Emtpy resolved routing of hostname {}".format(hostname))
             print("Empty proxy_map result")
