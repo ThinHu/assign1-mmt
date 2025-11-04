@@ -76,6 +76,8 @@ def forward_request(host, port, request):
             "\r\n"
             "404 Not Found"
         ).encode('utf-8')
+    finally:
+        backend.close()
 
 
 def resolve_routing_policy(hostname, routes):

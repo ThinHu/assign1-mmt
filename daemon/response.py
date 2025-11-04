@@ -132,7 +132,7 @@ class Response():
         # <--- ĐÃ SỬA: Logic xử lý MIME type được viết lại cho rõ ràng
         
         # Đặt header Content-Type trước
-        self.headers['Content-Type'] = mime_type
+        self.headers['Content-Type'] = str(mime_type)
 
         # Xác định thư mục dựa trên MIME type
         if mime_type == 'text/html':
@@ -160,13 +160,27 @@ class Response():
         ...
         """
 
-        filepath = os.path.join(base_dir, path.lstrip('/'))
-        
+        # filepath = os.path.join(base_dir, path.lstrip('/'))
+        # Lược bỏ dấu / ở đầu path
+        rel_path = path.lstrip('/')
+
+        # Tạo đường dẫn mục tiêu và chuẩn hóa
+        target = os.path.join(base_dir, rel_path)
+
+        # SỬA: thay vì kiểm tra chuỗi '..', dùng realpath + commonpath để an toàn
+        base_real = os.path.realpath(base_dir)
+        target_real = os.path.realpath(target)
+
+        # Nếu target không nằm trong base -> từ chối
+
         # Đảm bảo đường dẫn là an toàn (không đi ngược thư mục)
-        if '..' in filepath:
+        # if '..' in filepath:
+        if not os.path.commonpath([base_real]) == os.path.commonpath([base_real, target_real]):
+            # Không cho phép truy cập ra ngoài base_dir
             raise IOError("File path is not allowed")
 
-        print("[Response] serving the object at location {}".format(filepath))
+        # print("[Response] serving the object at location {}".format(filepath))
+        print("[Response] serving the object at location {}".format(target_real))
             
         #
         #  TODO: implement the step of fetch the object file
@@ -175,7 +189,7 @@ class Response():
         # <--- ĐÃ SỬA: Hoàn thành TODO ---
         content = b""
         # Mở tệp ở chế độ 'rb' (read binary) vì chúng ta cần gửi bytes
-        with open(filepath, 'rb') as f:
+        with open(target_real, 'rb') as f:
             content = f.read()
         
         return len(content), content
@@ -270,3 +284,43 @@ class Response():
 
         # 6. Trả về header + nội dung
         return self._header + self._content
+    
+    def build_unauthorized(self):
+        """
+        Xây dựng phản hồi 401 Unauthorized (Task 1A & 1B).
+        [cite: 174, 178]
+        """
+        self.status_code = 401
+        self.reason = "Unauthorized"
+        content = b"401 Unauthorized"
+
+        headers = (
+            f"HTTP/1.1 {self.status_code} {self.reason}\r\n"
+            "Content-Type: text/plain\r\n"
+            f"Content-Length: {len(content)}\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+        )
+
+        return headers.encode('utf-8') + content
+
+    def build_login_success(self, request):
+        """
+        Xây dựng phản hồi cho việc đăng nhập thành công (Task 1A).
+        Phản hồi này sẽ trả về trang index VÀ đặt cookie.
+        [cite: 173]
+        """
+
+        # 1. Đặt cookie 'auth=true' [cite: 173]
+        # Hàm build_response_header sẽ tự động đọc từ self.cookies
+        self.cookies['auth'] = 'true; Path=/'
+
+        # 2. "Giả mạo" request để làm cho build_response
+        # trả về trang /index.html [cite: 173]
+        request.path = "/index.html"
+        request.method = "GET"
+
+        # 3. Gọi hàm build_response thông thường
+        # Hàm này sẽ đọc path mới, lấy tệp index.html
+        # và build_response_header sẽ đọc cookie chúng ta vừa set
+        return self.build_response(request)
