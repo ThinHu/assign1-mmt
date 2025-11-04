@@ -18,6 +18,7 @@ This module provides a Request object to manage and persist
 request settings (cookies, auth, proxies).
 """
 from .dictionary import CaseInsensitiveDict
+import json as json_lib
 
 class Request():
     """The fully mutable "class" `Request <Request>` object,
@@ -112,25 +113,40 @@ class Request():
             #
 
         self.headers = self.prepare_headers(request)
-        cookies = self.headers.get('cookie', '')
+        cookies_string = self.headers.get('cookie', '')
             #
             #  TODO: implement the cookie function here
             #        by parsing the header            #
-
+        self.cookies = {}
+        if cookies_string:
+            cookie_pairs = cookies_string.split('; ')
+            for pair in cookie_pairs:
+                if '=' in pair:
+                    name, value = pair.split('=', 1)
+                    self.cookies[name.strip()] = value
         return
 
     def prepare_body(self, data, files, json=None):
-        self.prepare_content_length(self.body)
+        body = None
+        if json is not None:
+            body = json_lib.dumps(json).encode('utf-8')
+            self.headers['Content-Type'] = 'application/json'
+        elif data is not None:
+            body = data if isinstance(data, bytes) else str(data).encode('utf-8')
+        elif files is not None:
+            # Simplified: just join file content
+            combined = b""
+            for f in files:
+                combined += f.read() if isinstance(f.read(), bytes) else f.read().encode()
+            body = combined
+        else:
+            body = b""
         self.body = body
-        #
-        # TODO prepare the request authentication
-        #
-	# self.auth = ...
-        return
+        self.prepare_content_length(self.body)
 
 
     def prepare_content_length(self, body):
-        self.headers["Content-Length"] = "0"
+        self.headers["Content-Length"] = str(len(body)) if body else "0"
         #
         # TODO prepare the request authentication
         #
