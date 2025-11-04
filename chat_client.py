@@ -2,7 +2,7 @@
 import socket
 import threading
 import argparse
-import http.client  # <--- DA SUA: Thu vien HTTP client cua Python 3
+import http.client
 import json
 import time
 
@@ -39,10 +39,8 @@ class ChatClient:
         headers = {"Content-type": "application/json"}
         
         try:
-            # <--- DA SUA: Su dung http.client.HTTPConnection
             conn = http.client.HTTPConnection(self.tracker_ip, self.tracker_port)
             
-            # <--- DA SUA: body phai duoc encode sang bytes
             conn.request("POST", "/submit-info", json.dumps(payload).encode('utf-8'), headers)
             response = conn.getresponse()
             
@@ -59,13 +57,11 @@ class ChatClient:
         Giai doan 1: Lay danh sach peer tu Tracker (Client-Server)
         """
         try:
-            # <--- DA SUA: Su dung http.client.HTTPConnection
             conn = http.client.HTTPConnection(self.tracker_ip, self.tracker_port)
             conn.request("GET", "/get-list")
             response = conn.getresponse()
             
             if response.status == 200:
-                # <--- DA SUA: response.read() tra ve bytes, can decode
                 data = json.loads(response.read().decode('utf-8'))
                 self.peer_list = data.get("peers", {})
                 print(f"[Client] Da cap nhat danh sach peer: {len(self.peer_list)} peers")
@@ -97,11 +93,8 @@ class ChatClient:
         Xu ly tin nhan P2P den.
         """
         try:
-            # <--- DA SUA: data nhan ve la bytes, can decode
             data = conn.recv(1024).decode('utf-8')
             if data:
-                # \r de dua con tro ve dau dong, \n de xuong hang
-                # flush=True de in ra ngay lap tuc
                 print(f"\r[Tin nhan P2P tu {addr[0]}]: {data}\n[Ban]: ", end="", flush=True)
         except Exception as e:
             print(f"\r[Client] Loi khi nhan tin nhan P2P: {e}")
@@ -127,7 +120,6 @@ class ChatClient:
             try:
                 peer_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 peer_socket.connect((peer_ip, peer_port))
-                # <--- DA SUA: Gui di du lieu da encode sang bytes
                 peer_socket.sendall(full_message.encode('utf-8'))
                 peer_socket.close()
             except Exception as e:
@@ -145,7 +137,6 @@ class ChatClient:
         
         try:
             while True:
-                # <--- DA SUA: Su dung input() thay vi raw_input()
                 msg = input("[Ban]: ")
                 if msg.lower() == '/quit':
                     break
@@ -170,10 +161,10 @@ class ChatClient:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='P2P Chat Client')
-    parser.add_argument('--username', required=True, help='Ten cua ban (bat buoc)')
-    parser.add_argument('--port', type=int, required=True, help='Port P2P de ban lang nghe (bat buoc)')
-    parser.add_argument('--tracker_ip', default='127.0.0.1', help='IP cua may chu tracker')
-    parser.add_argument('--tracker_port', type=int, default=8001, help='Port cua may chu tracker (mac dinh 8001)')
+    parser.add_argument('--username', required=True)
+    parser.add_argument('--port', type=int, required=True)
+    parser.add_argument('--tracker_ip', default='127.0.0.1')
+    parser.add_argument('--tracker_port', type=int, default=8001)
     
     args = parser.parse_args()
     

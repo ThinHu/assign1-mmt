@@ -103,18 +103,12 @@ class HttpAdapter:
             
             #
             # TODO: handle for App hook here
-            # ĐÃ HIỆN THỰC:
-            # 1. Gọi hàm hook (ví dụ: submit_info) với header VÀ body của request
-            # 2. Lấy kết quả trả về (dưới dạng 'dict')
-            #
             try:
                 api_response_dict = req.hook(headers=req.headers, body=req.body)
                 
-                # 3. Chuyển dict thành chuỗi JSON
                 json_body = json.dumps(api_response_dict)
                 content_length = len(json_body)
                 
-                # 4. Xây dựng phản hồi HTTP 200 OK với nội dung là JSON
                 response = (
                     "HTTP/1.1 200 OK\r\n"
                     "Content-Type: application/json\r\n"
@@ -138,15 +132,7 @@ class HttpAdapter:
                 ).encode('utf-8')
 
         else:
-            #
-            # Nếu KHÔNG có hook, đây là yêu cầu file tĩnh (ví dụ: /index.html)
-            # Giữ nguyên logic cũ:
-            #
-            # Build response
             response = resp.build_response(req)
-
-        # --- KẾT THÚC PHẦN SỬA ĐỔI ---
-        #
 
         #print(response)
         conn.sendall(response)
@@ -159,7 +145,6 @@ class HttpAdapter:
         ...
         """
         cookies = {}
-        # Lấy header từ req, không phải 'headers' (biến không tồn tại)
         cookie_header = req.headers.get('cookie', '')
         if cookie_header:
             for pair in cookie_header.split(';'):
@@ -167,7 +152,7 @@ class HttpAdapter:
                     key, value = pair.strip().split("=")
                     cookies[key] = value
                 except ValueError:
-                    pass # Bỏ qua cookie bị định dạng sai
+                    pass
         return cookies
 
     def build_response(self, req, resp):
@@ -176,22 +161,15 @@ class HttpAdapter:
         """
         response = Response()
 
-        # Set encoding.
-        # response.encoding = get_encoding_from_headers(response.headers) # Hàm này không tồn tại
         response.raw = resp
-        # response.reason = response.raw.reason # resp không có 'raw'
-        response.reason = "OK" # Giả định
+        response.reason = "OK"
 
         if isinstance(req.url, bytes):
             response.url = req.url.decode("utf-8")
         else:
             response.url = req.url
 
-        # Add new cookies from the server.
-        # response.cookies = extract_cookies(req) # Đây là phương thức, không phải hàm
-        response.cookies = self.extract_cookies(req, resp) # Sửa lại cách gọi
-
-        # Give the Response some context.
+        response.cookies = self.extract_cookies(req, resp)
         response.request = req
         response.connection = self
 
