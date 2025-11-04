@@ -37,10 +37,13 @@ from .dictionary import CaseInsensitiveDict
 #: Used to determine routing targets for incoming requests.
 PROXY_PASS = {
     "192.168.56.103:8080": ('192.168.56.103', 9000),
-    "app1.local": ('192.168.56.103', 9001),
-    "app2.local": ('192.168.56.103', 9002),
+    "app1.local": ('127.0.0.1', 9001),
+    "app2.local": [('127.0.0.1', 9002),('127.0.0.1', 9003)],  # load balancing example
 }
 
+'''Round-robin policy counter for each hostname'''
+rr_counter ={}
+rr_lock = threading.Lock() # locking for thread-safe counter update
 
 def forward_request(host, port, request):
     """
@@ -90,10 +93,8 @@ def resolve_routing_policy(hostname, routes):
     :params routes (dict): dictionary mapping hostnames and location.
     """
 
-    print(hostname)
     proxy_map, policy = routes.get(hostname,('127.0.0.1:9000','round-robin'))
-    print(proxy_map)
-    print(policy)
+
 
     proxy_host = ''
     proxy_port = '9000'
@@ -107,15 +108,25 @@ def resolve_routing_policy(hostname, routes):
             # Use a dummy host to raise an invalid connection
             proxy_host = '127.0.0.1'
             proxy_port = '9000'
-        elif len(value) == 1:
+        elif len(proxy_map) == 1:
             proxy_host, proxy_port = proxy_map[0].split(":", 2)
         #elif: # apply the policy handling 
         #   proxy_map
         #   policy
-        else:
-            # Out-of-handle mapped host
-            proxy_host = '127.0.0.1'
-            proxy_port = '9000'
+        elif len(proxy_map) > 1:
+            # print("[Proxy] resolve route of hostname {} with multiple alternatives".format(hostname))
+            if policy == 'round-robin':
+                with rr_lock:
+                    index = rr_counter.get(hostname, 0)
+                    rr_counter[hostname] = (index + 1) % len(proxy_map)
+                    backend = proxy_map[index]
+                proxy_host, proxy_port = backend.split(":", 2)
+                # print("[Proxy] round-robin selected index {} for hostname {}".format(index, hostname))
+                
+        # else:
+        #     # Out-of-handle mapped host
+        #     proxy_host = '127.0.0.1'
+        #     proxy_port = '9000'
     else:
         print("[Proxy] resolve route of hostname {} is a singulair to".format(hostname))
         proxy_host, proxy_port = proxy_map.split(":", 2)

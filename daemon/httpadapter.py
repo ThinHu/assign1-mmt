@@ -358,7 +358,7 @@ class HttpAdapter:
             for pair in cookie_header.split(';'):
                 try:
                     key, value = pair.strip().split("=")
-                    cookies[key] = value
+                    cookies[key.strip()] = value.strip()
                 except ValueError:
                     pass
         return cookies
