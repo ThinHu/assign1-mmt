@@ -270,7 +270,11 @@ class HttpAdapter:
                     result = resp.build_unauthorized()
                     send_and_close(result)
                     return
-
+            if req.method == "GET" and req.path == "/login":
+                req.path = "/login.html"
+                result = resp.build_response(req)
+                send_and_close(result)
+                return
             # Task 1B: GET /index.html (or /)
             if req.method == "GET" and req.path in ["/index.html"]:
                 # check cookie auth
