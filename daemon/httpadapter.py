@@ -248,33 +248,30 @@ class HttpAdapter:
                     pass
 
             # Task 1A: POST /login
-            if req.method == "POST" and req.path == "/login":
-                # parse form body (application/x-www-form-urlencoded)
-                from urllib.parse import parse_qs
-                parsed = parse_qs(req.body, keep_blank_values=True)
-                username = parsed.get("username", [""])[0]
-                password = parsed.get("password", [""])[0]
+            # if req.method == "POST" and req.path == "/login":
+            #     # parse form body (application/x-www-form-urlencoded)
+            #     from urllib.parse import parse_qs
+            #     parsed = parse_qs(req.body, keep_blank_values=True)
+            #     username = parsed.get("username", [""])[0]
+            #     password = parsed.get("password", [""])[0]
 
-                if username == "admin" and password == "password":
-                    # build login-success response (sets cookie + returns index)
-                    resp.cookies.clear()
-                    resp.cookies["auth"] = "true; Path=/"
-                    # Ensure request points to index for building content
-                    req.path = "/index.html"
-                    req.method = "GET"
-                    result = resp.build_response(req)
-                    send_and_close(result)
-                    return
-                else:
-                    # invalid credentials -> 401
-                    result = resp.build_unauthorized()
-                    send_and_close(result)
-                    return
-            if req.method == "GET" and req.path == "/login":
-                req.path = "/login.html"
-                result = resp.build_response(req)
-                send_and_close(result)
-                return
+            #     if username == "admin" and password == "password":
+            #         # build login-success response (sets cookie + returns index)
+            #         resp.cookies.clear()
+            #         resp.cookies["auth"] = "true; Path=/"
+            #         # Ensure request points to index for building content
+            #         req.path = "/index.html"
+            #         req.method = "GET"
+            #         result = resp.build_response(req)
+            #         # result = resp.redirect("/", cookies=resp.cookies)
+            #         send_and_close(result)
+            #         return
+            #     else:
+            #         # invalid credentials -> 401
+            #         result = resp.build_unauthorized()
+            #         send_and_close(result)
+            #         return
+           
             # Task 1B: GET /index.html (or /)
             if req.method == "GET" and req.path in ["/index.html"]:
                 # check cookie auth
@@ -297,20 +294,25 @@ class HttpAdapter:
             # If a webapp hook is present, call it (we expect a dict -> JSON)
             if req.hook:
                 try:
-                    api_response = req.hook(headers=req.headers, body=req.body)
-                    import json
-                    json_body = json.dumps(api_response)
-                    content_length = len(json_body.encode("utf-8"))
-                    response_bytes = (
-                        "HTTP/1.1 200 OK\r\n"
-                        "Content-Type: application/json\r\n"
-                        f"Content-Length: {content_length}\r\n"
-                        "Connection: close\r\n"
-                        "\r\n"
-                        f"{json_body}"
-                    ).encode("utf-8")
-                    send_and_close(response_bytes)
+                    api_response = req.hook(req)
+                    # if not isinstance(api_response,Response):
+                    #     import json
+                    #     json_body = json.dumps(api_response)
+                    #     content_length = len(json_body.encode("utf-8"))
+                    #     response_bytes = (
+                    #         "HTTP/1.1 200 OK\r\n"
+                    #         "Content-Type: application/json\r\n"
+                    #         f"Content-Length: {content_length}\r\n"
+                    #         "Connection: close\r\n"
+                    #         "\r\n"
+                    #         f"{json_body}"
+                    #     ).encode("utf-8")
+                    #     send_and_close(response_bytes)
+                    #     return
+                    # else:
+                    send_and_close(api_response)
                     return
+
                 except Exception as e:
                     import json
                     err = json.dumps({"error": "Internal Server Error", "message": str(e)})

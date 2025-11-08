@@ -21,6 +21,7 @@ based on incoming requests.
 The current version supports MIME type detection, content loading and header formatting
 """
 import datetime
+import json
 import os
 import mimetypes
 from .dictionary import CaseInsensitiveDict
@@ -137,8 +138,10 @@ class Response():
         # Xác định thư mục dựa trên MIME type
         if mime_type == 'text/html':
             base_dir = BASE_DIR + "www/"
-        elif mime_type == 'text/css' or mime_type == 'application/javascript':
-            base_dir = BASE_DIR + "static/"
+        elif mime_type == 'text/css':
+            base_dir = BASE_DIR + "static/css"
+        elif mime_type == 'text/javascript':
+            base_dir = BASE_DIR + "static/js"
         elif mime_type.startswith('image/'):
             base_dir = BASE_DIR + "static/"
         elif mime_type.startswith('application/'):
@@ -245,7 +248,59 @@ class Response():
                 "\r\n"
                 "404 Not Found"
             ).encode('utf-8')
+    
+    # def build_success(self, body):
+    #     json_body = json.dumps(body)
+    #     content_length = len(json_body.encode("utf-8"))
+    #     return (
+    #             "HTTP/1.1 200 OK\r\n"
+    #             "Content-Type: application/json\r\n"
+    #             f"Content-Length: {content_length}\r\n"
+    #             "Connection: close\r\n"
+    #             "\r\n"
+    #             f"{json_body}"
+    #         ).encode("utf-8")
 
+    def build_success(self, body):
+        # self.status = 200
+        # self.headers = {"Content-Type": "application/json"}
+        json_body = json.dumps(body)
+        content_length = len(json_body.encode("utf-8"))
+
+        return (
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {content_length}\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            f"{json_body}"
+        ).encode("utf-8")
+
+
+
+    def build_bad_request(self, body):
+        json_body = json.dumps(body)
+        content_length = len(json_body.encode("utf-8"))
+        return (
+            "HTTP/1.1 400 Bad Request\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {content_length}\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            f"{json_body}"
+        ).encode("utf-8")
+
+    def build_internal_error(self, body):
+        json_body = json.dumps(body)
+        content_length = len(json_body.encode("utf-8"))
+        return (
+            "HTTP/1.1 500 Internal Server Error\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {content_length}\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            f"{json_body}"
+        ).encode("utf-8")
 
     def build_response(self, request):
         """
@@ -303,6 +358,8 @@ class Response():
         )
 
         return headers.encode('utf-8') + content
+    
+    
 
     def build_login_success(self, request):
         """
@@ -324,3 +381,4 @@ class Response():
         # Hàm này sẽ đọc path mới, lấy tệp index.html
         # và build_response_header sẽ đọc cookie chúng ta vừa set
         return self.build_response(request)
+    

@@ -1,8 +1,79 @@
-<html><body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+      margin: 0;
+    }
+    form {
+      border: 1px solid #ccc;
+      padding: 20px;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+    }
+    input {
+      margin: 8px 0;
+      padding: 6px;
+      width: 100%;
+    }
+    input[type="submit"] {
+      width: auto;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
 <h1>Login</h1>
-<form method="POST" action="/login">
-  Username: <input name="username" type="text"><br>
-  Password: <input name="password" type="password"><br>
+
+<form id="loginForm" method="POST" action="/login">
+  <label>Username:</label><br>
+  <input name="username" type="text" required><br>
+  <label>Password:</label><br>
+  <input name="password" type="password" required><br>
   <input type="submit" value="Login">
 </form>
-</body></html>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    // Lấy tracker IP + port hiện tại từ URL
+    const trackerIP = window.location.hostname; // ví dụ 127.0.0.1
+    const trackerPort = window.location.port;   // ví dụ 9000
+    localStorage.setItem("trackerIP", trackerIP);
+    localStorage.setItem("trackerPort", trackerPort);
+});
+
+document.getElementById("loginForm").addEventListener("submit", function(e){
+    e.preventDefault(); 
+
+    const username = this.username.value;
+    const password = this.password.value;
+
+    // Lấy tracker IP + port từ localStorage
+    const trackerIP = localStorage.getItem("trackerIP");
+    const trackerPort = localStorage.getItem("trackerPort");
+
+    fetch(`http://${trackerIP}:${trackerPort}/login`, {
+        method: "POST",
+        headers: {"Content-Type": "application/x-www-form-urlencoded"},
+        body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+    })
+    .then(resp => resp.ok ? resp.text() : Promise.reject("Login failed"))
+    .then(html => {
+        // Nếu login thành công → redirect sang submit-info page
+        window.location.href = `/`;
+    })
+    .catch(err => alert(err));
+});
+</script>
+
+</body>
+</html>
